@@ -1,4 +1,4 @@
-import pandas as pda
+import pandas as pd
 import re
 
 ## functions to apply regex; created with help from chatgpt
