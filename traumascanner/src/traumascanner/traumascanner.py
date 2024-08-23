@@ -5,10 +5,10 @@ import pandas as pd
 import numpy as np
 
 
-from text_targets import partial_trauma_targets, exact_trauma_targets, fp_trauma_phrases, negative_hemorrhage_phrases, rescue_phrases
+from text_targets import partial_trauma_targets, exact_trauma_targets, fp_trauma_phrases, fp_trauma_phrases_strings, negative_hemorrhage_phrases, rescue_phrases
 from import_data import import_radiology_reports, rename_radiology_reports_columns 
 from export_data import save_dataset
-from apply_targets import sentence_has_target, report_has_target
+from apply_targets import sentence_has_target, report_has_target, get_matching_sentences, find_matching_phrases
 
 #todo: 
 # add flags/annotations/separate file for which words/phrases were flagged? 
@@ -29,29 +29,85 @@ def traumascanner(path_to_csv,
 
     # standardize column names
     rad_reports = rename_radiology_reports_columns(rad_reports, patient_id_column, scan_id_column, text_column)
-
-    ## partial-text matching
-    if eval_partial_trauma_targets == True:
-        print('eval partial_trauma_targets')
-        potential_tbi_trauma = rad_reports[rad_reports['report_text'].str.contains('|'.join(partial_trauma_targets), case = False, regex = True)]
     
+    ## identify trauma reports with key-word matching
+    
+    # partial-text matching
+    if eval_partial_trauma_targets == True:
+        print('Searching for radiology reports with partial matches to trauma target keyword list')
+    
+        # create a copy of radiology report dataframe
+        rad_reports_partial = rad_reports.copy()
+    
+        # Create a new column to store the matched trauma-related words
+        rad_reports_partial['partial_matched_trauma_words'] = ''
+
+        # Iterate over each report in the DataFrame
+        for idx, report in rad_reports_partial['report_text'].iteritems():
+            # Create a list of trauma-related words found in the report
+            found_trauma_words = [word for word in partial_trauma_targets if pd.notna(report) and re.search(word, report, re.IGNORECASE)]
+
+            # Store the list of found words in the 'matched_trauma_words' column
+            rad_reports_partial.at[idx, 'partial_matched_trauma_words'] = found_trauma_words
+
+        # Optionally, filter out the rows where no trauma-related words were found
+        partial_matched_reports = rad_reports_partial[rad_reports_partial['partial_matched_trauma_words'].str.len() > 0]
+        
+        #print estimated number of potential reports
+        print('Est. number of partially matched reports:', len(partial_matched_reports))
+              
     ## exact-text matching
     if eval_exact_trauma_targets == True:
-        print('eval exact_trauma_targets')
+        print('Searching for radiology reports with exact matches to trauma target keyword list')
+    
+        # create a copy of radiology report dataframe
+        rad_reports_exact = rad_reports.copy()
+        
         # initialize an empty DataFrame to store the results
         exact_results_df = pd.DataFrame()
 
-        for word in exact_trauma_targets:
-            exact_match_result = rad_reports[rad_reports["report_text"].str.contains(fr'\b{word}\b', case=False, regex=True)]
-            exact_results_df = pd.concat([exact_results_df, exact_match_result])
+        rad_reports_exact['exact_matched_trauma_words'] = ''
+
+        # Iterate over each report in the DataFrame
+        for idx, report in rad_reports_exact['report_text'].iteritems():
+            # Create a list of words found in the report
+            found_words = [word for word in exact_trauma_targets if pd.notna(report) and re.search(fr'\b{word}\b', report, re.IGNORECASE)]
+
+            # Store the list of found words in the 'matched_trauma_words' column
+            rad_reports_exact.at[idx, 'exact_matched_trauma_words'] = found_words
+
+        # Optionally, filter out the rows where no trauma-related words were found
+        exact_matched_reports = rad_reports_exact[rad_reports_exact['exact_matched_trauma_words'].str.len() > 0]
+        
+        #print estimated number of potential reports
+        print('Est. number of exact matched reports:', len(exact_matched_reports))
 
     # combine the dataframe of reports that matched our exact or partial-text matching criteria
     if eval_partial_trauma_targets == True & eval_exact_trauma_targets == True:
+        
         print('combining potential and exact matches')
-        report_matches = [potential_tbi_trauma, exact_results_df]
+        report_matches = [partial_matched_reports[['unique_study_id', 'report_num', 'report_text']], 
+                          exact_matched_reports[['unique_study_id', 'report_num', 'report_text']]]
 
         # combine dataframes and drop any duplicated reports which may appear in both
-        potential_tbi_trauma_reports = pd.concat(report_matches).drop_duplicates()
+        reports_combined = pd.concat(report_matches).drop_duplicates()
+        
+        # combine the dataframe of reports that matched our exact or partial-text matching criteria
+        reports_combined = pd.merge(reports_combined,
+                                    exact_matched_reports[['unique_study_id', 'report_num', 'report_text', 'exact_matched_trauma_words']],
+                                    how = 'left')
+
+        reports_combined = pd.merge(reports_combined,
+                                    partial_matched_reports[['unique_study_id', 'report_num', 'report_text', 'partial_matched_trauma_words']],
+                                    on = ['unique_study_id', 'report_num', 'report_text'],
+                                    how = 'left')
+        
+        # modify strings
+        reports_combined['exact_matched_trauma_words'] = reports_combined['exact_matched_trauma_words'].astype('str').str.strip('[]')
+        reports_combined['partial_matched_trauma_words'] = reports_combined['partial_matched_trauma_words'].astype('str').str.strip('[]')
+        
+        # combine dataframes and drop any duplicated reports which may appear in both
+        potential_tbi_trauma_reports = reports_combined.drop_duplicates()
 
         ### Remove likely/uncertain false positives for trauma
 
@@ -64,12 +120,28 @@ def traumascanner(path_to_csv,
         # For example, a patient may have a MVC, however, the radiologist might write: "no evidence of recent traumatic injury". 
         # This is okay, because the overall objective is to identify patients with post-traumatic hemorrhage. 
         print('identifying reports that are false positives for trauma')
-        potential_trauma_fp = potential_tbi_trauma_reports[potential_tbi_trauma_reports['report_text'].apply(report_has_target, target_sets=fp_trauma_phrases)]
+        potential_trauma_fp = potential_tbi_trauma_reports[potential_tbi_trauma_reports['report_text'].apply(report_has_target, target_sets = fp_trauma_phrases)]
 
+        # add annotations to indicate which sentences matched regular expressions
+        # Apply the function to the DataFrame and create a new column with matching sentences
+        potential_trauma_fp['matching_sentences'] = potential_trauma_fp['report_text'].apply(get_matching_sentences, regex_phrases = fp_trauma_phrases)
+
+        # Filter rows where there is at least one matching sentence
+        potential_trauma_fp = potential_trauma_fp[potential_trauma_fp['matching_sentences'].apply(bool)]
+        
+        # add annotations to indicate which phrases matched
+        potential_trauma_fp['report_text'] = potential_trauma_fp['report_text'].astype('str')
+        potential_trauma_fp['matching_regex'] = potential_trauma_fp['report_text'].apply(find_matching_phrases, regex_phrases = fp_trauma_phrases_strings)
+        
         ## **Remove the likely FP reports from the `potential_tbi_trauma_reports`**
 
         # remove the reports that match the regex pattern above
-        potential_tbi_trauma_reports = potential_tbi_trauma_reports[~(potential_tbi_trauma_reports['report_text'].apply(report_has_target, target_sets=fp_trauma_phrases))]
+        potential_tbi_trauma_reports = potential_tbi_trauma_reports[~(potential_tbi_trauma_reports['report_text'].apply(report_has_target, target_sets = fp_trauma_phrases))]
+        
+        print('number of patients after removing false trauma reports')
+        print(len(potential_tbi_trauma_reports[['unique_study_id']].drop_duplicates()))
+        print('number of reports after removing false trauma reports')
+        print(len(potential_tbi_trauma_reports[['report_num']].drop_duplicates()))
 
         ### Identify post-traumatic hemorrhage
 
@@ -118,7 +190,7 @@ def traumascanner(path_to_csv,
         print('saving processed dataset to:', path_to_save)
         save_dataset(processed_dataset = post_traumatic_hem_reports, path_to_save = path_to_save)
 
-        return(post_traumatic_hem_reports) 
-    
+        #return(post_traumatic_hem_reports, potential_trauma_fp) 
+        return(potential_tbi_trauma_reports, potential_trauma_fp, potential_tbi_no_hem, rescue_additional_reports, post_traumatic_hem_reports)
 
 
