@@ -9,12 +9,18 @@ exact_trauma_targets = ['auto', 'accidents', 'accident', 'hit', 'stab', 'stabbed
                  'brain injury', 'head injury', 'fell', 'contrecoup', 'contracoup', 'coup', 'tSAH']
 
  # the following regex employs a positive lookahead assertion; 
- # it makes sure to remove sentences where No comes before the words (recent|known|history|...), which also come before (trauma|traumatic)
+ # it makes sure to remove sentences where 'No' comes before the words (recent|known|history|...), which also come before (trauma|traumatic)
 fp_trauma_phrases = [
     [r'(?i)\b(no|negative)\b(?=.*(\b(recent|known|obvious|history|reported|definite)\b.*\b(trauma|traumatic)\b))'],
     [r'(?i)\b(vascular accident)\b'],
     [r'(?i)\b(anoxic brain injury)\b']
 ]
+
+
+fp_trauma_phrases_strings = [r'(?i)\b(no|negative)\b(?=.*(\b(recent|known|obvious|history|reported|definite)\b.*\b(trauma|traumatic)\b))',
+                             r'(?i)\b(vascular accident)\b',
+                             r'(?i)\b(anoxic brain injury)\b']
+
 
 # Define the regular expression pattern for each of the expressions
 # this set of patterns will be applied to each sentence of each report
