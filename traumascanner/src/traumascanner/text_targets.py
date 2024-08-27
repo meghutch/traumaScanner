@@ -16,7 +16,7 @@ fp_trauma_phrases = [
     [r'(?i)\b(anoxic brain injury)\b']
 ]
 
-
+# add string based version to support annotation functions
 fp_trauma_phrases_strings = [r'(?i)\b(no|negative)\b(?=.*(\b(recent|known|obvious|history|reported|definite)\b.*\b(trauma|traumatic)\b))',
                              r'(?i)\b(vascular accident)\b',
                              r'(?i)\b(anoxic brain injury)\b']
@@ -48,6 +48,20 @@ negative_hemorrhage_phrases = [
     [r'(?i)\b(without evidence for acute abnormality)\b'],
     [r'(?i)\b(without acute abnormality)\b']
 ]
+
+
+# add string based version to support annotation functions
+negative_hemorrhage_phrases_strings = ['(?i)\\b(no|negative)\\b(?!.*\\b(new|additional)\\b).*?\\b(evidence|acute|intracranial)\\b.*?\\b(trauma|traumatic|hemorrhage|hematoma)\\b',
+'(?i)\\b(no|negative)\\b(?:(?!(\\bnew\\b|\\badditional\\b)).)*\\b(trauma|traumatic|hemorrhage|hematoma)\\b',
+ '(?i)\\b(no|negative)\\b(?=.*(\\b(acute)\\b.*\\b(findings)\\b))',
+ '(?i)\\b(no|negative)\\b(?=.*(\\b(intracranial|acute)\\b.*\\b(abnormality|abnormalities)\\b))',
+ '(?i)\\b(no|negative)\\b(?=.*(\\b(abnormality|abnormalities)\\b))',
+ '(?i)\\b(unremarkable|negative)\\b(?=.*(\\b(exam|head\\sCT|CT|study)\\b))',
+ '(?i)\\b(normal study|normal CT|normal head CT|normal exam|normal head CT|normal noncontrast|normal plain)\\b',
+ '(?i)\\b(no|negative|without\\sevidence)\\b(?=.*(\\b(intracranial)\\b.*\\b(process|pathology)\\b))',
+ '(?i)\\b(without acute intracranial abnormality)\\b',
+ '(?i)\\b(without evidence for acute abnormality)\\b',
+ '(?i)\\b(without acute abnormality)\\b']
 
 # evaluate whether we are excluding patients with "no additional hemorrohage"
 # try ensuring "No" prior to (additional|change|decrease) in (hematoma|hemorrhage|contusion)
