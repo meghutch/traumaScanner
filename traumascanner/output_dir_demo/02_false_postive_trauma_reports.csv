@@ -1,0 +1,2 @@
+unique_study_id,report_num,report_text,exact_matched_trauma_words,partial_matched_trauma_words,matching_sentences,matching_regex
+15311,20,"History: Vertigo and imbalance. CT Head: No known trauma. No acute intracranial hemorrhage or mass effect. Small vestibular schwannoma noted on the right side. Impression: Right vestibular schwannoma, suggest follow-up with neurosurgery and audiology.",nan,'trauma',['CT Head: No known trauma'],['(?i)\\b(no|negative)\\b(?=.*(\\b(recent|known|obvious|history|reported|definite)\\b.*\\b(trauma|traumatic)\\b))']
