@@ -5,19 +5,13 @@ import pandas as pd
 import numpy as np
 
 
-from text_targets import partial_trauma_targets, exact_trauma_targets, fp_trauma_phrases, fp_trauma_phrases_strings, negative_hemorrhage_phrases, rescue_phrases
-from import_data import import_radiology_reports, rename_radiology_reports_columns 
-from export_data import save_dataset
-from apply_targets import sentence_has_target, report_has_target, get_matching_sentences, find_matching_phrases
+from traumascanner.text_targets import partial_trauma_targets, exact_trauma_targets, fp_trauma_phrases, fp_trauma_phrases_strings, negative_hemorrhage_phrases, negative_hemorrhage_phrases_strings, rescue_phrases
+from traumascanner.import_data import import_radiology_reports, rename_radiology_reports_columns 
+from traumascanner.export_data import save_dataset
+from traumascanner.apply_targets import sentence_has_target, report_has_target, get_matching_sentences, find_matching_phrases
 
-#todo: 
-# add flags/annotations/separate file for which words/phrases were flagged? 
-# add regex notes in docs (documentation folder)
-# add docstrings and documentation within this/other scripts
-# return/save multiple outputs:potential_trauma_fp? 
-
-def traumascanner(path_to_csv,
-                  path_to_save,
+def traumascanner(path_to_data,
+                  path_to_output_dir,
                   patient_id_column, 
                   scan_id_column,
                   text_column,
@@ -25,7 +19,7 @@ def traumascanner(path_to_csv,
                   eval_exact_trauma_targets = True):
 
     # import csv of radiology reports
-    rad_reports = import_radiology_reports(path_to_csv)
+    rad_reports = import_radiology_reports(path_to_data)
 
     # standardize column names
     rad_reports = rename_radiology_reports_columns(rad_reports, patient_id_column, scan_id_column, text_column)
@@ -153,13 +147,19 @@ def traumascanner(path_to_csv,
         # this will identify all reports with no hemorrhage
         # for this process; we will create an abbreviated version of the larger dataset `potential_tbi_trauma_reports` and apply our `target_sets`
         print('identify and remove reports that indicate an absence of post-traumatic hemorrhage')
-        potential_tbi_no_hem = potential_tbi_trauma_reports[['unique_study_id', 'report_num', 'report_text']].drop_duplicates()
-        potential_tbi_no_hem = potential_tbi_no_hem[potential_tbi_no_hem['report_text'].apply(report_has_target, target_sets=negative_hemorrhage_phrases)]
+        potential_tbi_no_hem = potential_tbi_trauma_reports[['unique_study_id', 'report_num', 'report_text', 'exact_matched_trauma_words', 'partial_matched_trauma_words']].drop_duplicates()
+        potential_tbi_no_hem = potential_tbi_no_hem[potential_tbi_trauma_reports['report_text'].apply(report_has_target, target_sets = negative_hemorrhage_phrases)]
+        
+        potential_tbi_no_hem['matching_sentences'] = potential_tbi_no_hem['report_text'].apply(get_matching_sentences, regex_phrases = negative_hemorrhage_phrases)
 
         # print number of reports flagged as no traumatic hemorrhage
         print('num unique reports without hemorrhage', len(potential_tbi_no_hem[['report_num']].drop_duplicates()))
         print('num unique patients without no hemorrhage', len(potential_tbi_no_hem[['unique_study_id']].drop_duplicates()))
 
+        # add annotations to indicate which phrases matched
+        potential_tbi_no_hem['report_text'] = potential_tbi_no_hem['report_text'].astype('str')
+        potential_tbi_no_hem['matching_regex'] = potential_tbi_no_hem['report_text'].apply(find_matching_phrases, regex_phrases = negative_hemorrhage_phrases_strings)
+            
         #### Return patients with likely hemorrhage
 
         #Next, we will merge the patients with potentially no hemorrhage, with the original `potential_tbi_trauma_reports` dataset, 
@@ -187,8 +187,8 @@ def traumascanner(path_to_csv,
         print('number of unique patients with post-traumatic hemorrhage:', len(post_traumatic_hem_reports[['unique_study_id']].drop_duplicates()))
 
         # save post-traumatic hemorrhage reports
-        print('saving processed dataset to:', path_to_save)
-        save_dataset(processed_dataset = post_traumatic_hem_reports, path_to_save = path_to_save)
+        print('saving processed dataset to:', path_to_output_dir)
+        save_dataset(potential_tbi_trauma_reports, potential_trauma_fp, potential_tbi_no_hem, rescue_additional_reports, post_traumatic_hem_reports, path_to_output_dir = path_to_output_dir)
 
         #return(post_traumatic_hem_reports, potential_trauma_fp) 
         return(potential_tbi_trauma_reports, potential_trauma_fp, potential_tbi_no_hem, rescue_additional_reports, post_traumatic_hem_reports)
