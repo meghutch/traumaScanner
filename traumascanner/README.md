@@ -29,7 +29,7 @@ The function will output the following csv files:
 - 04_resucued_reports.csv - the subset of trauma_no_hemorrhage_reports which were likely false negatives
 - 05_post_traumatic_hemorrhage_reports - the complete set of post-traumatic hemorrhage reports identified via the `traumaScanner()` algorithm. 
 
-
+Please see the [demo_traumaScanner.ipynb](demo_traumaScanner.ipynb) to learn how to use traumaScanner on your own radiology reports.
 
 
 ## License
